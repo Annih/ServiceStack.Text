@@ -69,7 +69,12 @@ namespace ServiceStack.Text.FastMember
 
         private static void WriteGetter(ILGenerator il, Type type, PropertyInfo[] props, FieldInfo[] fields, bool isStatic)
         {
-            LocalBuilder loc = type.IsValueType ? il.DeclareLocal(type) : null;
+#if NETFX_CORE
+            bool isValueType = type.IsValueType();
+#else
+            bool isValueType = type.IsValueType;
+#endif
+            LocalBuilder loc = isValueType ? il.DeclareLocal(type) : null;
             OpCode propName = isStatic ? OpCodes.Ldarg_1 : OpCodes.Ldarg_2, target = isStatic ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1;
             foreach (PropertyInfo prop in props)
             {
@@ -83,8 +88,13 @@ namespace ServiceStack.Text.FastMember
                 // match:
                 il.Emit(target);
                 Cast(il, type, loc);
-                il.EmitCall(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetGetMethod(), null);
+                il.EmitCall(isValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetGetMethod(), null);
+#if NETFX_CORE
+                if (prop.PropertyType.IsValueType())
+#else
                 if (prop.PropertyType.IsValueType)
+#endif
+
                 {
                     il.Emit(OpCodes.Box, prop.PropertyType);
                 }
@@ -103,7 +113,11 @@ namespace ServiceStack.Text.FastMember
                 il.Emit(target);
                 Cast(il, type, loc);
                 il.Emit(OpCodes.Ldfld, field);
+#if NETFX_CORE
+                if (field.FieldType.IsValueType())
+#else
                 if (field.FieldType.IsValueType)
+#endif
                 {
                     il.Emit(OpCodes.Box, field.FieldType);
                 }
@@ -117,7 +131,12 @@ namespace ServiceStack.Text.FastMember
         }
         private static void WriteSetter(ILGenerator il, Type type, PropertyInfo[] props, FieldInfo[] fields, bool isStatic)
         {
-            if (type.IsValueType)
+#if NETFX_CORE
+            bool isValueType = type.IsValueType();
+#else
+            bool isValueType = type.IsValueType;
+#endif
+            if (isValueType)
             {
                 il.Emit(OpCodes.Ldstr, "Write is not supported for structs");
                 il.Emit(OpCodes.Newobj, typeof(NotSupportedException).GetConstructor(new Type[] { typeof(string) }));
@@ -128,7 +147,7 @@ namespace ServiceStack.Text.FastMember
                 OpCode propName = isStatic ? OpCodes.Ldarg_1 : OpCodes.Ldarg_2,
                        target = isStatic ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1,
                        value = isStatic ? OpCodes.Ldarg_2 : OpCodes.Ldarg_3;
-                LocalBuilder loc = type.IsValueType ? il.DeclareLocal(type) : null;
+                LocalBuilder loc = isValueType ? il.DeclareLocal(type) : null;
                 foreach (PropertyInfo prop in props)
                 {
                     if (prop.GetIndexParameters().Length != 0 || !prop.CanWrite) continue;
@@ -143,7 +162,7 @@ namespace ServiceStack.Text.FastMember
                     Cast(il, type, loc);
                     il.Emit(value);
                     Cast(il, prop.PropertyType, null);
-                    il.EmitCall(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod(), null);
+                    il.EmitCall(isValueType ? OpCodes.Call : OpCodes.Callvirt, prop.GetSetMethod(), null);
                     il.Emit(OpCodes.Ret);
                     // not match:
                     il.MarkLabel(next);
@@ -196,8 +215,15 @@ namespace ServiceStack.Text.FastMember
         }
         private static bool IsFullyPublic(Type type)
         {
+#if NETFX_CORE
+            TypeInfo typeInfo = type.GetTypeInfo();
+            while (typeInfo.IsNestedPublic) typeInfo = typeInfo.DeclaringType.GetTypeInfo();
+            return typeInfo.IsPublic;
+#else
             while (type.IsNestedPublic) type = type.DeclaringType;
             return type.IsPublic;
+#endif
+
         }
         static TypeAccessor CreateNew(Type type)
         {
@@ -209,7 +235,11 @@ namespace ServiceStack.Text.FastMember
             PropertyInfo[] props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
             FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
             ConstructorInfo ctor = null;
-            if(type.IsClass && !type.IsAbstract)
+#if NETFX_CORE
+            if (type.IsClass() && !type.IsAbstract())
+#else
+            if (type.IsClass && !type.IsAbstract)
+#endif
             {
                 ctor = type.GetConstructor(Type.EmptyTypes);
             }
@@ -235,7 +265,11 @@ namespace ServiceStack.Text.FastMember
             }
 
             // note this region is synchronized; only one is being created at a time so we don't need to stress about the builders
-            if(assembly == null)
+#if NETFX_CORE
+            TypeBuilder tb = module.DefineType("FastMember_dynamic." + type.Name + "_" + Interlocked.Increment(ref counter),
+                (typeof(TypeAccessor).GetTypeInfo().Attributes | TypeAttributes.Sealed) & ~TypeAttributes.Abstract, typeof(TypeAccessor) );
+#else
+            if (assembly == null)
             {
                 AssemblyName name = new AssemblyName("FastMember_dynamic");
                 assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
@@ -243,6 +277,7 @@ namespace ServiceStack.Text.FastMember
             }
             TypeBuilder tb = module.DefineType("FastMember_dynamic." + type.Name + "_" + Interlocked.Increment(ref counter),
                 (typeof(TypeAccessor).Attributes | TypeAttributes.Sealed) & ~TypeAttributes.Abstract, typeof(TypeAccessor) );
+#endif
 
             tb.DefineDefaultConstructor(MethodAttributes.Public);
             PropertyInfo indexer = typeof (TypeAccessor).GetProperty("Item");
@@ -273,14 +308,21 @@ namespace ServiceStack.Text.FastMember
                 il.Emit(OpCodes.Ret);
                 tb.DefineMethodOverride(body, baseMethod);
             }
-
+#if NETFX_CORE
+            return (TypeAccessor)Activator.CreateInstance(tb.CreateTypeInfo().AsType());
+#else
             return (TypeAccessor)Activator.CreateInstance(tb.CreateType());
+#endif
         }
 
         private static void Cast(ILGenerator il, Type type, LocalBuilder addr)
         {
             if(type == typeof(object)) {}
-            else if(type.IsValueType)
+#if NETFX_CORE
+            else if (type.IsValueType())
+#else
+            else if (type.IsValueType)
+#endif
             {
                 il.Emit(OpCodes.Unbox_Any, type);
                 if (addr != null)

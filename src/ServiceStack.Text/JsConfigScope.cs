@@ -18,7 +18,7 @@ namespace ServiceStack.Text
 
         internal JsConfigScope()
         {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETFX_CORE
             Thread.BeginThreadAffinity();
 #endif
             parent = head;
@@ -50,7 +50,7 @@ namespace ServiceStack.Text
                 Debug.Assert(this == head, "Disposed out of order.");
 
                 head = parent;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETFX_CORE
                 Thread.EndThreadAffinity();
 #endif
             }

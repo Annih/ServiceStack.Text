@@ -28,9 +28,13 @@ namespace ServiceStack.Text {
 		}
 
 		static DynamicProxy () {
-			var assemblyName = new AssemblyName("DynImpl");
+            var assemblyName = new AssemblyName("DynImpl");
+#if NETFX_CORE
+            DynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+#else
 			DynamicAssembly = AppDomain.CurrentDomain.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndSave);
-			ModuleBuilder = DynamicAssembly.DefineDynamicModule("DynImplModule");
+#endif
+            ModuleBuilder = DynamicAssembly.DefineDynamicModule("DynImplModule");
 		}
 
 		static Type GetConstructedType (Type targetType) {
@@ -47,11 +51,14 @@ namespace ServiceStack.Text {
 
 			foreach (var face in targetType.GetInterfaces())
 				IncludeType(face, typeBuilder);
+#if NETFX_CORE
+            return typeBuilder.CreateTypeInfo().AsType();
+#else
+            return typeBuilder.CreateType();
+#endif
+        }
 
-			return typeBuilder.CreateType();
-		}
-
-		static void IncludeType (Type typeOfT, TypeBuilder typeBuilder) {
+        static void IncludeType (Type typeOfT, TypeBuilder typeBuilder) {
 			var methodInfos = typeOfT.GetMethods();
 			foreach (var methodInfo in methodInfos) {
                 if (methodInfo.Name.StartsWith("set_", StringComparison.Ordinal)) continue; // we always add a set for a get.
@@ -77,9 +84,14 @@ namespace ServiceStack.Text {
 			var methodILGen = methodBuilder.GetILGenerator();
 			if (methodInfo.ReturnType == typeof(void)) {
 				methodILGen.Emit(OpCodes.Ret);
-			} else {
-				if (methodInfo.ReturnType.IsValueType || methodInfo.ReturnType.IsEnum) {
-					MethodInfo getMethod = typeof(Activator).GetMethod("CreateInstance",
+			} else
+            {
+#if NETFX_CORE
+                if (methodInfo.ReturnType.IsValueType() || methodInfo.ReturnType.IsEnum()) {
+#else
+                if (methodInfo.ReturnType.IsValueType || methodInfo.ReturnType.IsEnum) {
+#endif
+                    MethodInfo getMethod = typeof(Activator).GetMethod("CreateInstance",
 																	   new[] { typeof(Type) });
 					LocalBuilder lb = methodILGen.DeclareLocal(methodInfo.ReturnType);
 					methodILGen.Emit(OpCodes.Ldtoken, lb.LocalType);

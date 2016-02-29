@@ -93,13 +93,13 @@ namespace ServiceStack.Text
         /// <returns>The type if it exists</returns>
         public static Type FindType(string typeName, string assemblyName)
         {
-            var type = FindTypeFromLoadedAssemblies(typeName);
+#if !NETFX_CORE
+           var type = FindTypeFromLoadedAssemblies(typeName);
             if (type != null)
             {
                 return type;
             }
 
-#if !NETFX_CORE
             var binPath = GetAssemblyBinPath(Assembly.GetExecutingAssembly());
             Assembly assembly = null;
             var assemblyDllPath = binPath + String.Format("{0}.{1}", assemblyName, DllExt);
@@ -112,62 +112,17 @@ namespace ServiceStack.Text
             {
                 assembly = LoadAssembly(assemblyExePath);
             }
-            return assembly != null ? assembly.GetType(typeName) : null;
 #else
-            return null;
+            Assembly assembly = Assembly.GetEntryAssembly();
 #endif
-        }
-#endif
-
-#if NETFX_CORE
-        private sealed class AppDomain
-        {
-            public static AppDomain CurrentDomain { get; private set; }
-            public static Assembly[] cacheObj = null;
- 
-            static AppDomain()
-            {
-                CurrentDomain = new AppDomain();
-            }
- 
-            public Assembly[] GetAssemblies()
-            {
-                return cacheObj ?? GetAssemblyListAsync().Result.ToArray();
-            }
- 
-            private async System.Threading.Tasks.Task<IEnumerable<Assembly>> GetAssemblyListAsync()
-            {
-                var folder = Windows.ApplicationModel.Package.Current.InstalledLocation;
- 
-                List<Assembly> assemblies = new List<Assembly>();
-                foreach (Windows.Storage.StorageFile file in await folder.GetFilesAsync())
-                {
-                    if (file.FileType == ".dll" || file.FileType == ".exe")
-                    {
-                        try
-                        {
-                            var filename = file.Name.Substring(0, file.Name.Length - file.FileType.Length);
-                            AssemblyName name = new AssemblyName() { Name = filename };
-                            Assembly asm = Assembly.Load(name);
-                            assemblies.Add(asm);
-                        }
-                        catch (Exception)
-                        {
-                            // Invalid WinRT assembly!
-                        }
-                    }
-                }
-
-                cacheObj = assemblies.ToArray();
- 
-                return cacheObj;
-            }
+            return assembly != null ? assembly.GetType(typeName) : null;
         }
 #endif
 
 #if !XBOX
         public static Type FindTypeFromLoadedAssemblies(string typeName)
         {
+#if !NETFX_CORE
 #if SILVERLIGHT4
         	var assemblies = ((dynamic) AppDomain.CurrentDomain).GetAssemblies() as Assembly[];
 #else
@@ -181,11 +136,12 @@ namespace ServiceStack.Text
                     return type;
                 }
             }
+#endif
             return null;
         }
 #endif
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETFX_CORE
         private static Assembly LoadAssembly(string assemblyPath)
 		{
 			return Assembly.LoadFrom(assemblyPath);

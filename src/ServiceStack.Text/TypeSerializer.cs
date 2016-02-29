@@ -259,8 +259,11 @@ namespace ServiceStack.Text
 
                 sb.AppendFormat("{0} {1}", param.ParameterType.Name, param.Name);
             }
-
+#if NETFX_CORE
+            var info = "{0} {1}({2})".Fmt(method.ReturnType.Name, fn.GetMethodInfo().Name, sb);
+#else
             var info = "{0} {1}({2})".Fmt(method.ReturnType.Name, fn.Method.Name, sb);
+#endif
             return info;
         }
 

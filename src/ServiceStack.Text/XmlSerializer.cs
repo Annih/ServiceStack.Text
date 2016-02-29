@@ -113,7 +113,7 @@ namespace ServiceStack.Text
         {
             try
             {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETFX_CORE
 				using (var xw = new XmlTextWriter(writer))
 #else
                 using (var xw = XmlWriter.Create(writer))
@@ -131,7 +131,7 @@ namespace ServiceStack.Text
 
         public static void SerializeToStream(object obj, Stream stream)
         {
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETFX_CORE
             using (var xw = new XmlTextWriter(stream, Encoding.UTF8))
 #else
             using (var xw = XmlWriter.Create(stream))
@@ -143,7 +143,7 @@ namespace ServiceStack.Text
         }
 
 
-#if !SILVERLIGHT && !MONOTOUCH
+#if !SILVERLIGHT && !MONOTOUCH && !NETFX_CORE
         public static void CompressToStream<TXmlDto>(TXmlDto from, Stream stream)
         {
             using (var deflateStream = new DeflateStream(stream, CompressionMode.Compress))

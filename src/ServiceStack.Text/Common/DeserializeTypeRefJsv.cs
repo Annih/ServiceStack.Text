@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+#if NETFX_CORE
+using System.Reflection;
+#endif
 using ServiceStack.Text.Json;
 using ServiceStack.Text.Jsv;
 

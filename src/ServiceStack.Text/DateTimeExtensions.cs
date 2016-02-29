@@ -150,7 +150,7 @@ namespace ServiceStack.Text
             if (dateTime == DateTime.MinValue)
                 return MinDateTimeUtc;
 
-#if SILVERLIGHT
+#if SILVERLIGHT || NETFX_CORE
 			// Silverlight 3, 4 and 5 all work ok with DateTime.ToUniversalTime, but have no TimeZoneInfo.ConverTimeToUtc implementation.
 			return dateTime.ToUniversalTime();
 #else

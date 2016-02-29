@@ -165,12 +165,37 @@ namespace ServiceStack.Text
         public static bool IsNumericType(this Type type)
         {
             if (type == null) return false;
+#if NETFX_CORE
+            TypeInfo typeInfo = type.GetTypeInfo();
+            if (typeInfo.IsEnum) //TypeCode can be TypeCode.Int32
+            {
+                return JsConfig.TreatEnumAsInteger || type.IsEnumFlags();
+            }
+            switch (typeInfo.FullName)
+            {
+                case "System.Byte":
+                case "System.Decimal":
+                case "System.Double":
+                case "System.Int16":
+                case "System.Int32":
+                case "System.Int64":
+                case "System.SByte":
+                case "System.Single":
+                case "System.UInt16":
+                case "System.UInt32":
+                case "System.UInt64":
+                    return true;
 
+                case "System.Object":
+                    if (typeInfo.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        return IsNumericType(Nullable.GetUnderlyingType(type));
+                    return false;
+            }
+#else
             if (type.IsEnum) //TypeCode can be TypeCode.Int32
             {
                 return JsConfig.TreatEnumAsInteger || type.IsEnumFlags();
             }
-
             switch (Type.GetTypeCode(type))
             {
                 case TypeCode.Byte:
@@ -197,13 +222,33 @@ namespace ServiceStack.Text
                     }
                     return false;
             }
+#endif
             return false;
         }
-        
+
         public static bool IsIntegerType(this Type type)
         {
             if (type == null) return false;
+#if NETFX_CORE
+            TypeInfo typeInfo = type.GetTypeInfo();
+            switch (typeInfo.FullName)
+            {
+                case "System.Byte":
+                case "System.Int16":
+                case "System.Int32":
+                case "System.Int64":
+                case "System.SByte":
+                case "System.UInt16":
+                case "System.UInt32":
+                case "System.UInt64":
+                    return true;
 
+                case "System.Object":
+                    if (typeInfo.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        return IsNumericType(Nullable.GetUnderlyingType(type));
+                    return false;
+            }
+#else
             switch (Type.GetTypeCode(type))
             {
                 case TypeCode.Byte:
@@ -223,13 +268,30 @@ namespace ServiceStack.Text
                     }
                     return false;
             }
+#endif
             return false;
         }
 
         public static bool IsRealNumberType(this Type type)
         {
             if (type == null) return false;
+#if NETFX_CORE
+            TypeInfo typeInfo = type.GetTypeInfo();
+            switch (typeInfo.FullName)
+            {
+                case "System.Decimal":
+                case "System.Double":
+                case "System.Single":
+                    return true;
 
+                case "System.Object":
+                    if (typeInfo.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                    {
+                        return IsNumericType(Nullable.GetUnderlyingType(type));
+                    }
+                    return false;
+            }
+#else
             switch (Type.GetTypeCode(type))
             {
                 case TypeCode.Decimal:
@@ -244,6 +306,7 @@ namespace ServiceStack.Text
                     }
                     return false;
             }
+#endif
             return false;
         }
 
@@ -383,7 +446,11 @@ namespace ServiceStack.Text
 
         public static EmptyCtorDelegate GetConstructorMethodToCache(Type type)
         {
+#if NETFX_CORE
+            if (type.GetTypeInfo().IsInterface)
+#else
             if (type.IsInterface)
+#endif
             {
                 if (type.HasGenericType())
                 {
@@ -418,7 +485,7 @@ namespace ServiceStack.Text
             if (emptyCtor != null)
             {
 
-#if MONOTOUCH || c|| XBOX || NETFX_CORE
+#if MONOTOUCH || c || XBOX || NETFX_CORE
 				return () => Activator.CreateInstance(type);
 #elif WINDOWS_PHONE
                 return Expression.Lambda<EmptyCtorDelegate>(Expression.New(type)).Compile();
@@ -436,15 +503,14 @@ namespace ServiceStack.Text
                 return (EmptyCtorDelegate)dm.CreateDelegate(typeof(EmptyCtorDelegate));
 #endif
             }
+            if (type == typeof(string))
+                return () => String.Empty;
 
-#if (SILVERLIGHT && !WINDOWS_PHONE) || XBOX
+#if NETFX_CORE || (SILVERLIGHT && !WINDOWS_PHONE) || XBOX
             return () => Activator.CreateInstance(type);
 #elif WINDOWS_PHONE
             return Expression.Lambda<EmptyCtorDelegate>(Expression.New(type)).Compile();
 #else
-            if (type == typeof(string))
-                return () => String.Empty;
-
             //Anonymous types don't have empty constructors
             return () => FormatterServices.GetUninitializedObject(type);
 #endif
@@ -538,12 +604,20 @@ namespace ServiceStack.Text
 
         public static Func<T, string, object, object> GetOnDeserializing<T>()
         {
+#if NETFX_CORE
+            var method = typeof(T).GetMethod("OnDeserializing", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+#else
             var method = typeof(T).GetMethod("OnDeserializing", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(string), typeof(object) }, null);
+#endif
             if (method == null || method.ReturnType != typeof (object))
             {
                 return null;
             }
+#if NETFX_CORE
+            return (Func<T, string, object, object>)method.CreateDelegate(typeof(Func<T, string, object, object>));
+#else
             return (Func<T, string, object, object>)Delegate.CreateDelegate(typeof(Func<T, string, object, object>), method);
+#endif
         }
 
         public static FieldInfo[] GetSerializableFields(this Type type)
@@ -566,7 +640,7 @@ namespace ServiceStack.Text
             return type.HasAttribute<T>();
         }
 
-#if !SILVERLIGHT && !MONOTOUCH 
+#if !SILVERLIGHT && !MONOTOUCH
         static readonly Dictionary<Type, FastMember.TypeAccessor> typeAccessorMap 
             = new Dictionary<Type, FastMember.TypeAccessor>();
 #endif
@@ -793,7 +867,7 @@ namespace ServiceStack.Text
 
         internal static PropertyInfo[] GetTypesPublicProperties(this Type subType)
         {
-#if NETFX_CORE 
+#if NETFX_CORE
             return subType.GetRuntimeProperties().ToArray();
 #else
             return subType.GetProperties(
@@ -805,7 +879,7 @@ namespace ServiceStack.Text
 
         public static PropertyInfo[] Properties(this Type type)
         {
-#if NETFX_CORE 
+#if NETFX_CORE
             return type.GetRuntimeProperties().ToArray();
 #else
             return type.GetProperties();

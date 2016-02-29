@@ -173,8 +173,9 @@ namespace ServiceStack.Text
                 webReq.ContentType = contentType;
 
             webReq.Accept = acceptContentType;
-            webReq.Headers.Add(HttpRequestHeader.AcceptEncoding, "gzip,deflate");
+#if !NETFX_CORE
             webReq.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+#endif
 
             if (requestFilter != null)
             {
@@ -183,14 +184,21 @@ namespace ServiceStack.Text
 
             if (requestBody != null)
             {
+#if NETFX_CORE
+                using (var reqStream = webReq.GetRequestStreamAsync().Result)
+#else
                 using (var reqStream = webReq.GetRequestStream())
+#endif
                 using (var writer = new StreamWriter(reqStream))
                 {
                     writer.Write(requestBody);
                 }
             }
-
+#if NETFX_CORE
+            using (var webRes = webReq.GetResponseAsync().Result)
+#else
             using (var webRes = webReq.GetResponse())
+#endif
             using (var stream = webRes.GetResponseStream())
             using (var reader = new StreamReader(stream))
             {
@@ -236,8 +244,13 @@ namespace ServiceStack.Text
                 webReq.ContentType = contentType;
 
             webReq.Accept = acceptContentType;
+#if NETFX_CORE
+            webReq.Headers[HttpRequestHeader.AcceptEncoding] = "gzip,deflate";
+#else
             webReq.Headers.Add(HttpRequestHeader.AcceptEncoding, "gzip,deflate");
             webReq.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+#endif
+
 
             if (requestFilter != null)
             {
@@ -246,13 +259,20 @@ namespace ServiceStack.Text
 
             if (requestBody != null)
             {
+#if NETFX_CORE
+                using (var req = webReq.GetRequestStreamAsync().Result)
+#else
                 using (var req = webReq.GetRequestStream())
+#endif
                 {
                     req.Write(requestBody, 0, requestBody.Length);                    
                 }
             }
-
+#if NETFX_CORE
+            using (var webRes = webReq.GetResponseAsync().Result)
+#else
             using (var webRes = webReq.GetResponse())
+#endif
             {
                 if (responseFilter != null)
                     responseFilter((HttpWebResponse)webRes);
@@ -312,7 +332,11 @@ namespace ServiceStack.Text
             try
             {
                 var webReq = (HttpWebRequest)WebRequest.Create(url);
+#if NETFX_CORE
+                using (var webRes = webReq.GetResponseAsync().Result)
+#else
                 using (var webRes = webReq.GetResponse())
+#endif
                 {
                     var httpRes = webRes as HttpWebResponse;
                     return httpRes != null ? httpRes.StatusCode : (HttpStatusCode?)null;

@@ -104,17 +104,29 @@ namespace ServiceStack.Text.Common
 
         static Func<T, bool> GetShouldSerializeMethod(MemberInfo member)
         {
+#if NETFX_CORE
+            var method = member.DeclaringType.GetMethod("ShouldSerialize" + member.Name, BindingFlags.Instance | BindingFlags.Public);
+            return (method == null || method.ReturnType != typeof(bool)) ? null : (Func<T, bool>)method.CreateDelegate(typeof(Func<T, bool>));
+#else
             var method = member.DeclaringType.GetMethod("ShouldSerialize" + member.Name, BindingFlags.Instance | BindingFlags.Public,
                 null, Type.EmptyTypes, null);
             return (method == null || method.ReturnType != typeof(bool)) ? null : (Func<T,bool>)Delegate.CreateDelegate(typeof(Func<T,bool>), method);
+#endif
         }
 
         static Func<T,string, bool?> ShouldSerialize(Type type)
         {
+#if NETFX_CORE
+            var method = type.GetMethod("ShouldSerialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            return (method == null || method.ReturnType != typeof(bool?))
+                ? null
+                : (Func<T, string, bool?>)method.CreateDelegate(typeof(Func<T, string, bool?>));
+#else
             var method = type.GetMethod("ShouldSerialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(string) }, null);
             return (method == null || method.ReturnType != typeof(bool?)) 
                 ? null 
                 : (Func<T, string, bool?>)Delegate.CreateDelegate(typeof(Func<T,string, bool?>), method);
+#endif
         }
 
 
@@ -159,7 +171,11 @@ namespace ServiceStack.Text.Common
                     propertyName = dcsDataMember.Name ?? propertyInfo.Name;
                     propertyNameCLSFriendly = dcsDataMember.Name ?? propertyName.ToCamelCase();
                     propertyNameLowercaseUnderscore = dcsDataMember.Name ?? propertyName.ToLowercaseUnderscore();
+#if NETFX_CORE
+                    propertyReflectedName = dcsDataMember.Name ?? propertyInfo.ReflectedType().Name;
+#else
                     propertyReflectedName = dcsDataMember.Name ?? propertyInfo.ReflectedType.Name;
+#endif
 
                     // Fields tend to be at topp, push down properties to make it more like common.
                     propertyOrder = dcsDataMember.Order == DataMemberOrderNotSet ? 0 : dcsDataMember.Order;
@@ -170,7 +186,11 @@ namespace ServiceStack.Text.Common
                     propertyName = propertyInfo.Name;
                     propertyNameCLSFriendly = propertyName.ToCamelCase();
                     propertyNameLowercaseUnderscore = propertyName.ToLowercaseUnderscore();
+#if NETFX_CORE
+                    propertyReflectedName = propertyInfo.ReflectedType().Name;
+#else
                     propertyReflectedName = propertyInfo.ReflectedType.Name;
+#endif
                 }
 
 
@@ -210,7 +230,11 @@ namespace ServiceStack.Text.Common
                     propertyName = dcsDataMember.Name ?? fieldInfo.Name;
                     propertyNameCLSFriendly = dcsDataMember.Name ?? propertyName.ToCamelCase();
                     propertyNameLowercaseUnderscore = dcsDataMember.Name ?? propertyName.ToLowercaseUnderscore();
+#if NETFX_CORE
+                    propertyReflectedName = dcsDataMember.Name ?? fieldInfo.ReflectedType().Name;
+#else
                     propertyReflectedName = dcsDataMember.Name ?? fieldInfo.ReflectedType.Name;
+#endif
                     propertyOrder = dcsDataMember.Order;
                     propertySuppressDefaultAttribute = !dcsDataMember.EmitDefaultValue;
                 }
@@ -219,7 +243,11 @@ namespace ServiceStack.Text.Common
                     propertyName = fieldInfo.Name;
                     propertyNameCLSFriendly = propertyName.ToCamelCase();
                     propertyNameLowercaseUnderscore = propertyName.ToLowercaseUnderscore();
+#if NETFX_CORE
+                    propertyReflectedName = fieldInfo.ReflectedType().Name;
+#else
                     propertyReflectedName = fieldInfo.ReflectedType.Name;
+#endif
                 }
 
                 PropertyWriters[i + propertyNamesLength] = new TypePropertyWriter

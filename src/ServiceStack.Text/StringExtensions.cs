@@ -534,18 +534,6 @@ namespace ServiceStack.Text
             {
                 return new StreamReader( fileStream ).ReadToEnd( ) ;
             }
-#elif NETFX_CORE
-            var task = Windows.Storage.StorageFile.GetFileFromPathAsync(filePath);
-            task.AsTask().Wait();
-
-            var file = task.GetResults();
-            
-            var streamTask = file.OpenStreamForReadAsync();
-            streamTask.Wait();
-
-            var fileStream = streamTask.Result;
-
-            return new StreamReader( fileStream ).ReadToEnd( ) ;
 #elif WINDOWS_PHONE
             using (var isoStore = IsolatedStorageFile.GetUserStoreForApplication())
             {
@@ -668,7 +656,7 @@ namespace ServiceStack.Text
         private static readonly TextInfo TextInfo = CultureInfo.InvariantCulture.TextInfo;
         public static string ToTitleCase(this string value)
         {
-#if SILVERLIGHT || __MonoCS__
+#if NETFX_CORE || SILVERLIGHT || __MonoCS__
             string[] words = value.Split('_');
 
             for (int i = 0; i <= words.Length - 1; i++)

@@ -102,7 +102,11 @@ namespace ServiceStack.Text.Common
                 }
 
 #if !SILVERLIGHT && !MONOTOUCH
+#if NETFX_CORE
+                if (type.IsInterface() || type.IsAbstract())
+#else
                 if (type.IsInterface || type.IsAbstract)
+#endif
                 {
                     return DynamicProxy.GetInstanceFor(type).GetType();
                 }
@@ -301,11 +305,16 @@ namespace ServiceStack.Text.Common
             generator.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
             generator.Emit(OpCodes.Ldarg_1);
 
-            generator.Emit(propertyInfo.PropertyType.IsClass
+
+#if NETFX_CORE
+            bool isClass = propertyInfo.PropertyType.IsClass();
+#else
+            bool isClass = propertyInfo.PropertyType.IsClass;
+#endif
+            generator.Emit(isClass
                 ? OpCodes.Castclass
                 : OpCodes.Unbox_Any,
                 propertyInfo.PropertyType);
-
             generator.EmitCall(OpCodes.Callvirt, propSetMethod, (Type[])null);
             generator.Emit(OpCodes.Ret);
 
@@ -321,7 +330,13 @@ namespace ServiceStack.Text.Common
             generator.Emit(OpCodes.Castclass, fieldInfo.DeclaringType);
             generator.Emit(OpCodes.Ldarg_1);
 
-            generator.Emit(fieldInfo.FieldType.IsClass
+#if NETFX_CORE
+            bool isClass = fieldInfo.FieldType.IsClass();
+#else
+            bool isClass = fieldInfo.FieldType.IsClass;
+#endif
+
+            generator.Emit(isClass
                 ? OpCodes.Castclass
                 : OpCodes.Unbox_Any,
                 fieldInfo.FieldType);
@@ -338,7 +353,13 @@ namespace ServiceStack.Text.Common
             var name = string.Format("_{0}{1}_", "Set", memberInfo.Name);
             var returnType = typeof(void);
 
-            return !memberInfo.DeclaringType.IsInterface
+#if NETFX_CORE
+            bool isInterface = memberInfo.DeclaringType.IsInterface();
+#else
+            bool isInterface = memberInfo.DeclaringType.IsInterface;
+#endif
+
+            return !isInterface
                 ? new DynamicMethod(name, returnType, args, memberInfo.DeclaringType, true)
                 : new DynamicMethod(name, returnType, args, memberInfo.Module, true);
         }
